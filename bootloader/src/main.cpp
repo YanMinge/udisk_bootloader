@@ -73,6 +73,19 @@ void update_failed(void)
   {
     send_update_fail_page_en();
   }
+  while(1);
+}
+
+void firmware_exception(void)
+{
+  if(languag == LAN_CHINESE)
+  {
+    send_firmware_exception_page_ch();
+  }
+  else
+  {
+    send_firmware_exception_page_en();
+  }
 }
 
 uint32_t caculate_file_crc32(FIL* fp)
@@ -83,6 +96,7 @@ uint32_t caculate_file_crc32(FIL* fp)
   uint32_t crc_value = 0xffffffff;
   while(br == sizeof(buf))
   {
+    Serial.printf("f_read before\r\n");
     if((rc = f_read(fp, buf, sizeof(buf), &br)) != FR_OK)
     {
       Serial.printf("Unable to read file: %s (%d)\r\n", firmware_file, rc);
@@ -90,6 +104,7 @@ uint32_t caculate_file_crc32(FIL* fp)
       return 0;
     }
     crc_value = crc32(crc_value, buf, br, 0);
+    Serial.printf("f_read after\r\n");
   }
   crc_value = crc_value^0xFFFFFFFF;
   Serial.printf("caculate file crc32: 0x%x\r\n", crc_value);
@@ -110,6 +125,7 @@ uint32_t write_file_to_flash(FIL* fp)
     {
       Serial.printf("Unable to read file: %s (%d)\r\n", firmware_file, rc);
       f_close(fp);
+      Serial.printf("file closed\r\n");
       return 0;
     }
     write_flash((uint32_t *) address, (char *)buf, sizeof(buf));
@@ -222,23 +238,40 @@ static void new_execute_user_code(void)
 
 bool check_firmware_integrity(void)
 {
-  firmware_flash_crc = caculate_flash_crc32(firmware_size);
   if(firmware_flash_crc != firmware_crc)
   {
     Serial.printf("Firmware corruption\r\n");
-    update_failed();
+    firmware_exception();
+    while(1);
     return false;
   }
   else
   {
+    Serial.printf("Firmware no corruption\r\n");
     return true;
   }
+}
+
+void lcd_update_init(void)
+{
+  change_lcd_page(UPDATE_PAGE_NUM);
+  if(languag == LAN_CHINESE)
+  {
+    send_update_icon(UPDATE_ICON_TEXT_NUM_CH);
+  }
+  else
+  {
+    send_update_icon(UPDATE_ICON_TEXT_NUM_EN);
+  }
+  send_progressbar_status(0);
+  send_progress_percentage(0);
 }
 
 void check_udisk_firmware(void)
 {
   FRESULT rc;
   FIL file_obj;
+  FILINFO fno;
   uint32_t file_crc32;
   uint32_t flash_crc32;
   rc = f_mount(&fatFS, "/" , 0);     /* Register volume work area (never fails) */
@@ -253,68 +286,73 @@ void check_udisk_firmware(void)
     Serial.printf("Enter factory burning mode\r\n");
     is_factory = true;
   }
-
-  rc = f_open(&file_obj, firmware_file, FA_READ);
-  if(rc != FR_OK)
+  if(!f_stat(firmware_file, &fno))
   {
-    Serial.printf("Unable to open file: %s (%d)\r\n", firmware_file, rc);
-    update_failed();
-  }
-  else
-  {
-    file_crc32 = caculate_file_crc32(&file_obj);
-    if((is_factory == false) && (firmware_flash_crc == file_crc32))
+    rc = f_open(&file_obj, firmware_file, FA_READ);
+    if(rc != FR_OK)
     {
-      Serial.printf("This is the same firmware\r\n");
+      Serial.printf("Unable to open file: %s (%d)\r\n", firmware_file, rc);
+      //update_failed();
       return;
-    }
-
-    change_lcd_page(UPDATE_PAGE_NUM);
-    if(languag == LAN_CHINESE)
-    {
-      send_update_icon(UPDATE_ICON_TEXT_NUM_CH);
     }
     else
     {
-      send_update_icon(UPDATE_ICON_TEXT_NUM_EN);
-    }
-    send_progressbar_status(0);
-    send_progress_percentage(0);
-    uint32_t write_szie = write_file_to_flash(&file_obj);
-    if (write_szie == file_obj.obj.objsize)
-    {
-      Serial.printf("Complete!\n");
-      f_close(&file_obj);
-      flash_crc32 = caculate_flash_crc32(write_szie);
-      if(flash_crc32 == file_crc32)
+      lcd_update_init();
+      file_crc32 = caculate_file_crc32(&file_obj);
+      Serial.printf("caculate_file_crc32 after\r\n");
+      Serial.printf("firmware_flash_crc(%d) file_crc32(%d) is_factory(%d)\r\n",firmware_flash_crc,file_crc32,is_factory);
+      if((is_factory == false) && (firmware_flash_crc == file_crc32))
       {
-        Serial.printf("Firmware upgrade succeeded!\n");
-        save_firmware_data(write_szie, file_crc32);
-        if(languag == LAN_CHINESE)
+        Serial.printf("This is the same firmware\r\n");
+        delay(100);
+        lcd_receive_data_clear();
+        show_same_firmware_page_ch();
+        lcd_receive_data();
+        send_start_page();
+        return;
+      }
+      uint32_t write_szie = write_file_to_flash(&file_obj);
+      Serial.printf("write_szie = %d\n", write_szie);
+      if (write_szie == file_obj.obj.objsize)
+      {
+        Serial.printf("Complete!\n");
+        f_close(&file_obj);
+        flash_crc32 = caculate_flash_crc32(write_szie);
+        if(flash_crc32 == file_crc32)
         {
-          send_update_success_page_ch();
+          Serial.printf("Firmware upgrade succeeded!\n");
+          save_firmware_data(write_szie, file_crc32);
+          if(languag == LAN_CHINESE)
+          {
+            send_update_success_page_ch();
+          }
+          else
+          {
+            send_update_success_page_en();
+          }
+          if(is_factory == false)
+          {
+            rc = f_unlink(firmware_old);
+            rc = f_rename(firmware_file, firmware_old);
+          }
         }
         else
         {
-          send_update_success_page_en();
-        }
-        if(is_factory == false)
-        {
-          rc = f_unlink(firmware_old);
-          rc = f_rename(firmware_file, firmware_old);
+          update_failed();
+          Serial.printf("Firmware upgrade failed!!\n");
         }
       }
       else
       {
+        Serial.printf("Firmware upgrade failed!!\n");
         update_failed();
         Serial.printf("Firmware upgrade failed!!\n");
       }
     }
-    else
-    {
-      update_failed();
-      Serial.printf("Firmware upgrade failed!!\n");
-    }
+  }
+  else
+  {
+    check_firmware_integrity();
   }
 }
 
@@ -327,7 +365,7 @@ void setup()
   Serial.println("Bootloader Start\r\n");
   languag = get_language_type();
   load_firmware_data();
-  check_firmware_integrity();
+  firmware_flash_crc = caculate_flash_crc32(firmware_size);
   check_udisk_firmware();
   Serial.println("Load user program\r\n");
   new_execute_user_code();
