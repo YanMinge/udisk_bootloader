@@ -344,7 +344,6 @@ void check_udisk_firmware(void)
       }
       else
       {
-        Serial.printf("Firmware upgrade failed!!\n");
         update_failed();
         Serial.printf("Firmware upgrade failed!!\n");
       }
