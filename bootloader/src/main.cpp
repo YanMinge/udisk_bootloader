@@ -96,7 +96,6 @@ uint32_t caculate_file_crc32(FIL* fp)
   uint32_t crc_value = 0xffffffff;
   while(br == sizeof(buf))
   {
-    Serial.printf("f_read before\r\n");
     if((rc = f_read(fp, buf, sizeof(buf), &br)) != FR_OK)
     {
       Serial.printf("Unable to read file: %s (%d)\r\n", firmware_file, rc);
@@ -104,7 +103,6 @@ uint32_t caculate_file_crc32(FIL* fp)
       return 0;
     }
     crc_value = crc32(crc_value, buf, br, 0);
-    Serial.printf("f_read after\r\n");
   }
   crc_value = crc_value^0xFFFFFFFF;
   Serial.printf("caculate file crc32: 0x%x\r\n", crc_value);
@@ -125,7 +123,6 @@ uint32_t write_file_to_flash(FIL* fp)
     {
       Serial.printf("Unable to read file: %s (%d)\r\n", firmware_file, rc);
       f_close(fp);
-      Serial.printf("file closed\r\n");
       return 0;
     }
     write_flash((uint32_t *) address, (char *)buf, sizeof(buf));
@@ -299,8 +296,6 @@ void check_udisk_firmware(void)
     {
       lcd_update_init();
       file_crc32 = caculate_file_crc32(&file_obj);
-      Serial.printf("caculate_file_crc32 after\r\n");
-      Serial.printf("firmware_flash_crc(%d) file_crc32(%d) is_factory(%d)\r\n",firmware_flash_crc,file_crc32,is_factory);
       if((is_factory == false) && (firmware_flash_crc == file_crc32))
       {
         Serial.printf("This is the same firmware\r\n");
