@@ -49,9 +49,14 @@ bool lcd_data_available(void)
 
 void lcd_receive_data_clear(void)
 {
+  long timeout_judgment_value = millis();
   while(lcd_data_available())
   {
     read_lcd_data();
+    if(millis() - timeout_judgment_value > 500)
+    {
+      break;
+    }
   }
 }
 
@@ -91,10 +96,17 @@ bool is_command_comfirm_button(void)
 }
 void lcd_receive_data(void)
 {
+  long timeout_judgment_value = millis();
   while(true)
   {
+    if(millis() - timeout_judgment_value > 2000)
+    {
+      break;
+    }
     if(lcd_data_available())
+    {
       recevie_data_buf[receive_num++] = read_lcd_data();
+    }
     if(LCD_DATA_ERROR == lcd_receive_data_correct())
     {
       clear_lcd_data_buf();
@@ -108,10 +120,6 @@ void lcd_receive_data(void)
         break;
       }
       clear_lcd_data_buf();
-    }
-    else
-    {
-      continue;
     }
   }
 }
@@ -232,22 +240,22 @@ void send_update_success_page_en(void)
 
 void show_same_firmware_page_ch(void)
 {
-   lcd_send_data_int(PAGE_BASE + EXCEPTION_SURE_HINT_PAGE_CH, PAGE_ADDR);
-   lcd_send_data_int(SAME_FIRMWARE_ICON_NUM_CH, PRINT_STATUS_ADDR);
+  lcd_send_data_int(PAGE_BASE + EXCEPTION_SURE_HINT_PAGE_CH, PAGE_ADDR);
+  lcd_send_data_int(SAME_FIRMWARE_ICON_NUM_CH, PRINT_STATUS_ADDR);
 }
 
 void send_firmware_exception_page_ch(void)
 {
-   lcd_send_data_int(PAGE_BASE + PRINT_FIRMWARE_EXCEPTION_PAGE_CH, PAGE_ADDR);
+  lcd_send_data_int(PAGE_BASE + PRINT_FIRMWARE_EXCEPTION_PAGE_CH, PAGE_ADDR);
 }
 
 void send_firmware_exception_page_en(void)
 {
-   lcd_send_data_int(PAGE_BASE + PRINT_FIRMWARE_EXCEPTION_PAGE_EN, PAGE_ADDR);
+  lcd_send_data_int(PAGE_BASE + PRINT_FIRMWARE_EXCEPTION_PAGE_EN, PAGE_ADDR);
 }
 
 void send_start_page(void)
 {
-   lcd_send_data_int(PAGE_BASE + MACHINE_START_UP_PAGE, PAGE_ADDR);
+  lcd_send_data_int(PAGE_BASE + MACHINE_START_UP_PAGE, PAGE_ADDR);
 }
 

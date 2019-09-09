@@ -44,12 +44,16 @@ void SysTick_Callback(void)
 
 void hal_init(void)
 {
-  pinMode(P1_18,OUTPUT);
-  pinMode(P1_08,OUTPUT);
-  pinMode(P1_20,OUTPUT);
+  pinMode(P1_18,OUTPUT);   //HEAD HEAT L
+  pinMode(P1_09,OUTPUT);   //HEAD HEAT H
+  pinMode(P1_08,OUTPUT);   //DIR ENABLE
+  pinMode(P1_20,OUTPUT);   //BED HEAT
+  pinMode(P1_04, OUTPUT);  //EEPROM WP
   digitalWrite(P1_18,LOW);
+  digitalWrite(P1_09,LOW);
   digitalWrite(P1_08,LOW);
   digitalWrite(P1_20,LOW);
+  digitalWrite(P1_04, HIGH);
 }
 
 language_type get_language_type(void)
@@ -239,7 +243,7 @@ bool check_firmware_integrity(void)
   {
     Serial.printf("Firmware corruption\r\n");
     firmware_exception();
-    while(1);
+    while(true);
     return false;
   }
   else
@@ -275,6 +279,7 @@ void check_udisk_firmware(void)
   if(rc != FR_OK)
   {
     Serial.printf("udisk is not insert!\r\n");
+    check_firmware_integrity();
     return;
   }
   rc = f_open(&file_obj, factory_mask, FA_READ);
@@ -289,12 +294,10 @@ void check_udisk_firmware(void)
     if(rc != FR_OK)
     {
       Serial.printf("Unable to open file: %s (%d)\r\n", firmware_file, rc);
-      //update_failed();
       return;
     }
     else
     {
-      lcd_update_init();
       file_crc32 = caculate_file_crc32(&file_obj);
       if((is_factory == false) && (firmware_flash_crc == file_crc32))
       {
@@ -306,6 +309,7 @@ void check_udisk_firmware(void)
         send_start_page();
         return;
       }
+      lcd_update_init();
       uint32_t write_szie = write_file_to_flash(&file_obj);
       Serial.printf("write_szie = %d\n", write_szie);
       if (write_szie == file_obj.obj.objsize)
@@ -329,6 +333,7 @@ void check_udisk_firmware(void)
           {
             rc = f_unlink(firmware_old);
             rc = f_rename(firmware_file, firmware_old);
+            rc = f_unlink(firmware_file);
           }
         }
         else
@@ -357,6 +362,7 @@ void setup()
   SetupHardware();
   hal_init();
   Serial.println("Bootloader Start\r\n");
+  is_factory = false;
   languag = get_language_type();
   load_firmware_data();
   firmware_flash_crc = caculate_flash_crc32(firmware_size);
