@@ -49,11 +49,13 @@ void hal_init(void)
   pinMode(P1_08,OUTPUT);   //DIR ENABLE
   pinMode(P1_20,OUTPUT);   //BED HEAT
   pinMode(P1_04, OUTPUT);  //EEPROM WP
+  pinMode(P1_21, OUTPUT);  //BUZZER
   digitalWrite(P1_18,LOW);
   digitalWrite(P1_09,LOW);
   digitalWrite(P1_08,LOW);
   digitalWrite(P1_20,LOW);
   digitalWrite(P1_04, HIGH);
+  digitalWrite(P1_21, LOW);
 }
 
 language_type get_language_type(void)
@@ -359,8 +361,8 @@ void setup()
 {
   Serial.begin(115200);
   Serial3.begin(115200);
-  SetupHardware();
   hal_init();
+  SetupHardware();
   Serial.println("Bootloader Start\r\n");
   is_factory = false;
   languag = get_language_type();
